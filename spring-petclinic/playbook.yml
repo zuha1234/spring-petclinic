@@ -1,0 +1,42 @@
+---
+- hosts: all
+  become: yes
+  vars: 
+    tomcat_version: 9.0.36
+    tomcat_url: http://mirrors.estointernet.in/apache/tomcat/tomcat-{{tomcat_version.split(".")[0]}}/v{{tomcat_version}}/bin/apache-tomcat-{{tomcat_version}}.tar.gz
+    tomcat_port: 8088
+
+  tasks: 
+  - name: Updating Repos
+    yum: "name=* state=latest"
+
+  - name: Installing Java
+    yum: "name=java-1.8.0-openjdk state=present"
+
+  - name: Setting Java8 as default Java Version
+    alternatives: "name=java link=/usr/bin/java path=/usr/lib/jvm/jre-1.8.0-openjdk/bin/java"
+
+  - name: Downloading required tomcat
+    get_url: "url={{tomcat_url}} dest=/usr/local/"
+
+  - name: Extracting downloaded tomcat
+    unarchive: "src=/usr/local/apache-tomcat-{{tomcat_version}}.tar.gz dest=/usr/local/ remote_src=yes"
+    ignore_errors: yes
+    
+  - name: Renaming the extracted tomcat folder
+    command: "mv /usr/local/apache-tomcat-{{tomcat_version}} /usr/local/tomcat9"
+    ignore_errors: yes
+
+  - name: copying war file into tomcat server
+    copy: "src='target/petclinic.war' dest='/usr/local/tomcat9/webapps/'"
+    tags:
+    - modify_war
+    ignore_errors: yes
+
+  - name: Modifying tomcat port
+    template: "src=server.xml.j2 dest=/usr/local/tomcat9/conf/server.xml"
+    tags:
+    - modify_port
+
+  - name: Start tomcat
+    shell: "nohup /usr/local/tomcat9/bin/startup.sh &"
